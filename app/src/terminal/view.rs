@@ -406,7 +406,8 @@ use crate::banner::{
 use crate::debounce::debounce;
 use crate::editor::{
     AutosuggestionType, CrdtOperation, EditorAction, EditorView, Event as EditorEvent,
-    PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions,
+    PropagateAndNoOpEscapeKey, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
+    TextOptions,
 };
 use crate::features::FeatureFlag;
 use crate::pane_group::SplitPaneState;
@@ -15347,9 +15348,11 @@ impl TerminalView {
                 .collect();
             view.onekey_query.clear();
             // 复用常驻 editor:清空内容、把焦点稍后转过来。
-            view.onekey_search_editor.clone().update(ctx, |editor, ctx| {
-                editor.clear_buffer(ctx);
-            });
+            view.onekey_search_editor
+                .clone()
+                .update(ctx, |editor, ctx| {
+                    editor.clear_buffer(ctx);
+                });
 
             let items = view.build_onekey_menu_items();
             // 候选可能很多(用户保存了几十/几百台 SSH 服务器),按数量推导
@@ -15453,13 +15456,12 @@ impl TerminalView {
                 });
             }
             EditorEvent::Enter => {
-                let selected_action =
-                    ctx.update_view(&self.context_menu, |context_menu, _| {
-                        context_menu.selected_item().and_then(|item| match item {
-                            MenuItem::Item(fields) => fields.on_select_action().cloned(),
-                            _ => None,
-                        })
-                    });
+                let selected_action = ctx.update_view(&self.context_menu, |context_menu, _| {
+                    context_menu.selected_item().and_then(|item| match item {
+                        MenuItem::Item(fields) => fields.on_select_action().cloned(),
+                        _ => None,
+                    })
+                });
                 if let Some(TerminalAction::OneKeyFillSecret { index }) = selected_action {
                     self.fill_onekey_secret(index, ctx);
                 }
@@ -15502,11 +15504,13 @@ impl TerminalView {
         match order {
             // 命中为空:加一条 disabled 提示行,避免菜单只剩搜索框
             // 显得很怪;disabled 会被 select_next/previous 自动跳过。
-            OnekeyMenuRows::NoMatches => vec![
-                MenuItemFields::new(crate::t!("terminal-onekey-search-no-results"))
-                    .with_disabled(true)
-                    .into_item(),
-            ],
+            OnekeyMenuRows::NoMatches => {
+                vec![
+                    MenuItemFields::new(crate::t!("terminal-onekey-search-no-results"))
+                        .with_disabled(true)
+                        .into_item(),
+                ]
+            }
             OnekeyMenuRows::Ordered(indices) => indices
                 .into_iter()
                 .map(|index| {
@@ -15528,9 +15532,13 @@ impl TerminalView {
             self.close_context_menu(ctx, true);
             return;
         };
-        let mut bytes = candidate.secret.as_bytes().to_vec();
+        // 用 Zeroizing<Vec<u8>> 持有本函数内的明文副本,函数返回时自动清零;
+        // write_to_pty 收到的是另一份 Cow,那一份在事件系统/PTY 路径上无法
+        // zeroize(属于既有架构限制),但至少把本帧栈上的明文窗口缩到最小。
+        let mut bytes: zeroize::Zeroizing<Vec<u8>> =
+            zeroize::Zeroizing::new(candidate.secret.as_bytes().to_vec());
         bytes.push(b'\n');
-        self.write_to_pty(bytes, ctx);
+        self.write_to_pty(bytes.to_vec(), ctx);
         self.close_context_menu(ctx, true);
     }
 
@@ -18423,9 +18431,11 @@ impl TerminalView {
                 self.onekey_query.clear();
                 // 搜索 editor 是常驻字段(框架未提供 view 释放 API),
                 // 这里清空其内容以便下次打开时是干净状态。
-                self.onekey_search_editor.clone().update(ctx, |editor, ctx| {
-                    editor.clear_buffer(ctx);
-                });
+                self.onekey_search_editor
+                    .clone()
+                    .update(ctx, |editor, ctx| {
+                        editor.clear_buffer(ctx);
+                    });
                 // 该 `Menu` 实例被各类 ContextMenu 共用,关闭 OneKey 菜单时
                 // 把 variant 切回 Fixed 并清掉 pinned header,避免影响后续
                 // 右键 / Alt-screen 菜单。
@@ -25258,8 +25268,7 @@ where
         .enumerate()
         .filter_map(|(index, (label, subtitle))| {
             let label_score = match_indices_case_insensitive(label, query).map(|m| m.score);
-            let subtitle_score =
-                match_indices_case_insensitive(subtitle, query).map(|m| m.score);
+            let subtitle_score = match_indices_case_insensitive(subtitle, query).map(|m| m.score);
             let score = label_score.into_iter().chain(subtitle_score).max()?;
             Some((score, index))
         })
