@@ -1,3 +1,14 @@
+//! OneKey 凭据加载:从 SSH Manager 持久化层 + Keychain/DPAPI/Linux Keyring
+//! 读出所有已保存的 server 凭据,供 `TerminalView` 在检测到 PTY 密码提示时
+//! 弹出选择菜单。
+//!
+//! ## 注意
+//!
+//! - 内部调用 `warp_ssh_manager::with_conn`(同步 Mutex + SQLite)和
+//!   `KeychainSecretStore::get`(同步 OS API),**不可以**在 UI 主线程直接
+//!   同步调用——server 一多就会卡顿。调用方需走 `tokio::task::spawn_blocking`。
+//! - secret 全程用 `Zeroizing<String>` 持有,丢弃时自动清零。
+
 use anyhow::Result;
 use zeroize::Zeroizing;
 

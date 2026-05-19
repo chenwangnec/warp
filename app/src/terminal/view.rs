@@ -2299,6 +2299,9 @@ pub struct TerminalView {
     context_menu_state: Option<ContextMenuState>,
     onekey_prompt_candidates: Vec<OneKeyPromptCandidate>,
     onekey_last_prompt_at: Option<Instant>,
+    /// `secret_injector` 起飞后到完成/超时之间为 true。OneKey listener 看到
+    /// true 直接跳过,避免与自动注入同时弹菜单。
+    ssh_secret_auto_injection_in_flight: bool,
 
     /// The search bar at the top of the terminal view.
     find_bar: ViewHandle<Find<TerminalFindModel>>,
@@ -3774,6 +3777,7 @@ impl TerminalView {
             context_menu_state: None,
             onekey_prompt_candidates: Vec::new(),
             onekey_last_prompt_at: None,
+            ssh_secret_auto_injection_in_flight: false,
             context_menu,
             hovered_secret: None,
             open_secret_tool_tip: None,
@@ -15245,6 +15249,7 @@ impl TerminalView {
 
     fn show_onekey_prompt_menu(&mut self, ctx: &mut ViewContext<Self>) {
         if self.context_menu_state.is_some()
+            || self.ssh_secret_auto_injection_in_flight
             || self
                 .onekey_last_prompt_at
                 .is_some_and(|instant| instant.elapsed() < ONEKEY_PROMPT_THROTTLE)
@@ -15252,50 +15257,65 @@ impl TerminalView {
             return;
         }
 
-        let credentials = match load_saved_ssh_credentials() {
-            Ok(credentials) => credentials,
-            Err(e) => {
-                log::warn!("onekey: failed to load saved ssh credentials: {e:?}");
+        // 抢占 throttle 窗口,防止 stream 紧接着第二次 yield 时又起一个 spawn。
+        self.onekey_last_prompt_at = Some(Instant::now());
+
+        // Keychain + SQLite 都是同步阻塞 API,不能在 UI 线程跑。
+        // 走 spawn_blocking,完成后回到主线程展示菜单。
+        let future = async move {
+            tokio::task::spawn_blocking(load_saved_ssh_credentials)
+                .await
+                .unwrap_or_else(|e| Err(anyhow::anyhow!("onekey: join error: {e}")))
+        };
+        ctx.spawn(future, move |view, result, ctx| {
+            let credentials = match result {
+                Ok(credentials) => credentials,
+                Err(e) => {
+                    log::warn!("onekey: failed to load saved ssh credentials: {e:?}");
+                    return;
+                }
+            };
+            if credentials.is_empty() {
                 return;
             }
-        };
-        if credentials.is_empty() {
-            return;
-        }
+            // 二次确认:加载途中可能用户已经手动打开菜单或 injector 起飞了。
+            if view.context_menu_state.is_some() || view.ssh_secret_auto_injection_in_flight {
+                return;
+            }
 
-        self.onekey_prompt_candidates = credentials
-            .into_iter()
-            .map(|credential| OneKeyPromptCandidate {
-                label: credential.label,
-                subtitle: credential.subtitle,
-                secret: credential.secret,
-            })
-            .collect();
+            view.onekey_prompt_candidates = credentials
+                .into_iter()
+                .map(|credential| OneKeyPromptCandidate {
+                    label: credential.label,
+                    subtitle: credential.subtitle,
+                    secret: credential.secret,
+                })
+                .collect();
 
-        let items = self
-            .onekey_prompt_candidates
-            .iter()
-            .enumerate()
-            .map(|(index, candidate)| {
-                MenuItemFields::new_with_stacked_label(
-                    candidate.label.clone(),
-                    candidate.subtitle.clone(),
-                )
-                .with_icon(icons::Icon::Key)
-                .with_on_select_action(TerminalAction::OneKeyFillSecret { index })
-                .into_item()
-            })
-            .collect();
-        self.onekey_last_prompt_at = Some(Instant::now());
-        self.show_context_menu(
-            ContextMenuState {
-                menu_type: ContextMenuType::OneKeyPrompt,
-            },
-            items,
-            ctx,
-        );
-        ctx.update_view(&self.context_menu, |context_menu, ctx| {
-            context_menu.select_next(ctx);
+            let items = view
+                .onekey_prompt_candidates
+                .iter()
+                .enumerate()
+                .map(|(index, candidate)| {
+                    MenuItemFields::new_with_stacked_label(
+                        candidate.label.clone(),
+                        candidate.subtitle.clone(),
+                    )
+                    .with_icon(icons::Icon::Key)
+                    .with_on_select_action(TerminalAction::OneKeyFillSecret { index })
+                    .into_item()
+                })
+                .collect();
+            view.show_context_menu(
+                ContextMenuState {
+                    menu_type: ContextMenuType::OneKeyPrompt,
+                },
+                items,
+                ctx,
+            );
+            ctx.update_view(&view.context_menu, |context_menu, ctx| {
+                context_menu.select_next(ctx);
+            });
         });
     }
 
@@ -15318,6 +15338,11 @@ impl TerminalView {
         ) {
             self.close_context_menu(ctx, true);
         }
+    }
+
+    /// 仅由 `secret_injector` 在起飞/结束时调用。详见字段文档。
+    pub(crate) fn set_ssh_secret_auto_injection_in_flight(&mut self, in_flight: bool) {
+        self.ssh_secret_auto_injection_in_flight = in_flight;
     }
 
     fn alt_mouse_action(&mut self, mouse_state: &MouseState, ctx: &mut ViewContext<Self>) {

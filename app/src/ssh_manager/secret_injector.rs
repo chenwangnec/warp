@@ -56,6 +56,15 @@ pub fn spawn_password_injector<O>(
         return;
     }
 
+    // 起飞即把 in-flight 置 true,通知 OneKey listener 在本次 injection 完结前
+    // 不要弹菜单。这样无论是先 injector 注入完才轮到 onekey 看到同一段字节,
+    // 还是 onekey 先看到,语义都是统一的:**injector 优先**。
+    if let Some(view) = terminal_view.upgrade(ctx) {
+        view.update(ctx, |view, _| {
+            view.set_ssh_secret_auto_injection_in_flight(true);
+        });
+    }
+
     let owned_secret = secret.clone();
     let future = async move {
         match watch_for_prompt(rx).with_timeout(INJECT_TIMEOUT).await {
@@ -64,12 +73,15 @@ pub fn spawn_password_injector<O>(
         }
     };
     ctx.spawn(future, move |_owner, secret_opt, ctx| {
-        let Some(secret) = secret_opt else {
-            log::debug!("ssh secret injector: no prompt seen within timeout");
-            return;
-        };
         let Some(view) = terminal_view.upgrade(ctx) else {
             log::debug!("ssh secret injector: terminal view dropped before injection");
+            return;
+        };
+        let Some(secret) = secret_opt else {
+            log::debug!("ssh secret injector: no prompt seen within timeout");
+            view.update(ctx, |view, _| {
+                view.set_ssh_secret_auto_injection_in_flight(false);
+            });
             return;
         };
         view.update(ctx, |view, ctx| {
@@ -79,6 +91,7 @@ pub fn spawn_password_injector<O>(
             bytes.push(b'\n');
             view.write_to_pty(bytes, ctx);
             view.note_ssh_secret_auto_injected(ctx);
+            view.set_ssh_secret_auto_injection_in_flight(false);
         });
     });
 }
