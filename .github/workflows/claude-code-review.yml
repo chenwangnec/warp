@@ -12,16 +12,17 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    # 仅对本仓库内分支的 PR 自动跑 review。
+    # fork 来的 PR 在 pull_request 事件下拿不到 secrets,会直接失败;
+    # 同时 anthropics/claude-code-action 内部还会校验触发者具有 write
+    # 权限,fork 作者也过不了那一关。需要让 fork PR 也被 review 时,
+    # 维护者请在 PR 里评论 `@claude` 走 claude.yml 手动触发。
+    if: github.event.pull_request.head.repo.full_name == github.repository
 
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
       id-token: write
 
