@@ -5026,7 +5026,7 @@ impl AgentsWidget {
                 FormattedTextFragment::plain_text(" or "),
                 FormattedTextFragment::hyperlink(
                     "learn more about MCPs.",
-                    "https://docs.warp.dev/agent-platform/capabilities/mcp",
+                    "",
                 ),
             ];
 
@@ -5502,7 +5502,7 @@ impl SettingsWidget for MCPServersWidget {
             ),
             FormattedTextFragment::hyperlink(
                 crate::t!("common-learn-more"),
-                "https://docs.warp.dev/agent-platform/capabilities/mcp",
+                "",
             ),
         ];
 
@@ -5548,7 +5548,7 @@ impl SettingsWidget for MCPServersWidget {
                                 ),
                                 FormattedTextFragment::hyperlink(
                                     "See supported providers.",
-                                    "https://docs.warp.dev/agent-platform/capabilities/mcp#file-based-mcp-servers",
+                                    "",
                                 ),
                             ]
                         });
@@ -5633,7 +5633,7 @@ impl AIFactWidget {
             )),
             FormattedTextFragment::hyperlink(
                 crate::t!("settings-ai-learn-more"),
-                "https://docs.warp.dev/agent-platform/capabilities/rules",
+                "",
             ),
         ];
         let description = Container::new(

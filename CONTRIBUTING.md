@@ -11,7 +11,7 @@ Thanks for helping improve Zap! This guide explains how to open issues, propose 
 
 ## How Contributing to Zap Works
 
-Zap's contribution model is shaped by [Oz](https://oz.warp.dev), an agent that automates parts of triage, spec writing, implementation, and review. Compared with a typical open-source repository, a few things work differently here:
+Zap's contribution model is shaped by Oz, an agent that automates parts of triage, spec writing, implementation, and review. Compared with a typical open-source repository, a few things work differently here:
 
 - **Issues are the starting point for everything.** Discussion, scoping, and design happen on the issue before any PR is opened.
 - **Feature requests differ from bug fixes:**
@@ -52,7 +52,7 @@ flowchart TD
 
 ## Filing a Good Issue
 
-Search [existing issues](https://github.com/warpdotdev/warp/issues) before filing to avoid duplicates. Use the issue templates when filing.
+Search [existing issues](https://github.com/zerx-lab/warp/issues) before filing to avoid duplicates. Use the issue templates when filing.
 
 If you're already running Zap, the fastest way to file is the `/feedback` command — it opens a public GitHub issue with relevant context (logs, environment details) automatically attached.
 
@@ -118,7 +118,7 @@ If you'd rather have an **Oz cloud agent** implement a ready issue for you, ment
 
 Contributors with several merged PRs may be invited to become collaborators. Collaborators receive expanded permissions including the ability to:
 
-- Assign [Oz](https://warp.dev/oz) to work on issues by mentioning `@oz` in a comment on any issue that has a readiness label.
+- Assign Oz to work on issues by mentioning `@oz` in a comment on any issue that has a readiness label.
 - Use complimentary Oz credits for contributions to this repository.
 - Apply and manage issue labels.
 
@@ -155,7 +155,7 @@ Run unit tests with `cargo nextest run`. See [WARP.md](WARP.md) for more detail.
 
 ## Code of Conduct
 
-This project adopts the [Contributor Covenant](https://www.contributor-covenant.org/) (v2.1) as its code of conduct. All contributors and maintainers are expected to follow it in every project space. See [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for the full text, or report violations to warp-coc at warp.dev.
+This project adopts the [Contributor Covenant](https://www.contributor-covenant.org/) (v2.1) as its code of conduct. All contributors and maintainers are expected to follow it in every project space. See [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for the full text.
 
 ## Reporting Security Issues
 
@@ -163,6 +163,4 @@ See [`SECURITY.md`](SECURITY.md) for our security disclosure policy and private 
 
 ## Getting Help
 
-- Browse the [Zap docs](https://docs.warp.dev/).
-- Join the [Slack Community](https://go.warp.dev/join-preview) to ask questions and connect with other contributors.
-- Open a [GitHub issue](https://github.com/warpdotdev/warp/issues) for bugs or feature requests.
+- Open a [GitHub issue](https://github.com/zerx-lab/warp/issues) for bugs or feature requests.
