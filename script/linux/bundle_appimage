@@ -66,8 +66,10 @@ mkdir -p "$STAGE_DIR"
 source "$WORKSPACE_ROOT_DIR/script/linux/bundle_install" "$STAGE_DIR"
 
 # Modify the "Exec=" line in the .desktop file so the AppImage entrypoint
-# matches the actual binary copied inside the AppImage (no /usr/bin symlink).
-sed -i -E "s|^Exec=.*|Exec=$BINARY_NAME|" "$STAGE_DIR/usr/share/applications/$BUNDLE_ID.desktop"
+# directly invokes the binary copied inside the AppImage (no /usr/bin symlink
+# under the squashfs root). Preserve the `%U` URL handler argument so OS
+# desktop integrations can still pass it through.
+sed -i -E "s|^Exec=.*|Exec=$BINARY_NAME %U|" "$STAGE_DIR/usr/share/applications/$BUNDLE_ID.desktop"
 
 # Find all icon files from inside the package staging directory.
 ICON_FILES=( $(find "$STAGE_DIR/usr/share/icons" -name "*.png") )
